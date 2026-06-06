@@ -443,7 +443,6 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
         <option value="gemini-3.5-flash">3.5 Flash ⚡ (แนะนำ/ฟรี)</option>
         <option value="gemini-3-flash-preview">3 Flash ⚡ (ฟรี/Preview)</option>
         <option value="gemini-3.1-flash-lite">3.1 Flash-Lite 🚀 (ฟรี/เร็ว)</option>
-        <option value="gemini-2.5-flash">2.5 Flash ⚡ (ฟรี)</option>
         <option value="gemini-3.1-pro-preview">3.1 Pro 🎯 (จ่ายเงิน)</option>
       </select>
     </div>
@@ -723,10 +722,10 @@ async function callGemini(b64,mime){
 
   const body={
     contents:[{parts:[{text:buildPrompt(getLang())},{inline_data:{mime_type:mime,data:b64}}]}],
-    generationConfig:{temperature:0.1,maxOutputTokens:512,responseMimeType:'application/json'}
+    generationConfig:{temperature:0.1,maxOutputTokens:512}
   };
   const ctrl=new AbortController();
-  const tid=setTimeout(()=>ctrl.abort(),15000);
+  const tid=setTimeout(()=>ctrl.abort(),30000);
   let res;
   try{
     res=await fetch(getGeminiUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:ctrl.signal});
@@ -1009,9 +1008,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(keyInp&&savedKey)keyInp.value=savedKey;
   updateKeyBadge();
   // model — ล้างโมเดลเก่าที่ไม่รองรับแล้ว
-  const validModels=['gemini-3.5-flash','gemini-3-flash-preview','gemini-3.1-flash-lite','gemini-2.5-flash','gemini-3.1-pro-preview'];
+  const validModels=['gemini-3.5-flash','gemini-3-flash-preview','gemini-3.1-flash-lite','gemini-3.1-pro-preview'];
   const storedModel=localStorage.getItem('gm');
-  if(storedModel && !validModels.includes(storedModel)){localStorage.setItem('gm','gemini-3.5-flash');}
+  if(!storedModel || !validModels.includes(storedModel)){localStorage.setItem('gm','gemini-3.5-flash');}
   // model
   const savedModel=getGeminiModel();
   const modelSel=document.getElementById('model-sel');
