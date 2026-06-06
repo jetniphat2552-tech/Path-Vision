@@ -878,6 +878,8 @@ async function analyzeUpload(){
   try{
     const b64=await blobToBase64(snap);
     const raw=await callGemini(b64,snap.type||'image/jpeg');
+    console.log('Gemini raw response:', raw);
+    document.getElementById('upload-result-detail').textContent='Raw: '+raw.substring(0,200);
     const p=parseGemini(raw);
     const color=COLOR[p.safety]||'#e8f0ff',icon=ICON[p.safety]||'👁️';
     const m=document.getElementById('upload-result-main');
