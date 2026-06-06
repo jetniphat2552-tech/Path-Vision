@@ -722,7 +722,7 @@ async function callGemini(b64,mime){
 
   const body={
     contents:[{parts:[{text:buildPrompt(getLang())},{inline_data:{mime_type:mime,data:b64}}]}],
-    generationConfig:{temperature:0.1,maxOutputTokens:512}
+    generationConfig:{temperature:0.1,maxOutputTokens:1024}
   };
   const ctrl=new AbortController();
   const tid=setTimeout(()=>ctrl.abort(),30000);
@@ -749,9 +749,13 @@ async function callGemini(b64,mime){
 
 function parseGemini(raw){
   try{
-    return JSON.parse(raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim());
+    const clean=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+    try{return JSON.parse(clean);}catch(_){}
+    const m=clean.match(/\{[\s\S]*\}/);
+    if(m)return JSON.parse(m[0]);
+    throw new Error('no json');
   }catch(e){
-    return{hasPath:false,pathZone:'none',obstacles:[],obstacleZones:[],direction:'หยุด',dirEmoji:'⚠️',safety:'warning',speech:'ไม่สามารถอ่านผลได้ กรุณาลองใหม่',detail:'Parse error'};
+    return{hasPath:false,pathZone:'none',obstacles:[],obstacleZones:[],direction:'หยุด',dirEmoji:'⚠️',safety:'warning',speech:'ไม่สามารถวิเคราะห์ได้ กรุณาลองใหม่',detail:'Parse error'};
   }
 }
 
