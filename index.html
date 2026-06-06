@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Path Vision AI</title>
+<style>
+:root {
+  --bg:      #06080f;
+  --s1:      #0b0f1e;
+  --s2:      #111827;
+  --border:  #1e2d47;
+  --accent:  #3b82f6;
+  --cyan:    #22d3ee;
+  --green:   #22c55e;
+  --red:     #ef4444;
+  --amber:   #f59e0b;
+  --purple:  #a855f7;
+  --text:    #e8f0ff;
+  --muted:   #4a6a9a;
+  --glass:   rgba(11,15,30,0.85);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+#panel-camera,#panel-upload,#panel-esp32,#panel-settings{overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ── HEADER ── */
+#header{
+  background:linear-gradient(135deg,#070b18,#0c1225,#0a1020);
+  padding:13px 16px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid rgba(59,130,246,0.2);
+  position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(20px);
+  box-shadow:0 1px 24px rgba(0,0,0,0.4);
+}
+#header-logo{font-size:24px;filter:drop-shadow(0 0 8px #3b82f6aa)}
+#header h1{font-size:16px;font-weight:800;letter-spacing:-0.5px;
+  background:linear-gradient(135deg,#e8f0ff,#93c5fd);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#header-badge{
+  margin-left:auto;
+  background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(34,211,238,0.15));
+  border:1px solid rgba(59,130,246,0.4);
+  color:var(--cyan);font-size:10px;font-weight:700;
+  padding:4px 10px;border-radius:20px;letter-spacing:0.5px;
+  white-space:nowrap;
+}
+
+/* ── TABS ── */
+#tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:49px;z-index:99}
+.tab{flex:1;padding:11px 2px;text-align:center;font-size:11px;font-weight:600;
+  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+  transition:all .2s;letter-spacing:0.2px}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:active{opacity:.6;background:rgba(59,130,246,0.05)}
+
+/* ── PANELS ── */
+#panel-camera{display:block}
+#panel-upload,#panel-esp32,#panel-settings{display:none}
+
+/* ── TTS BANNER ── */
+#tts-banner{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  margin:10px 14px 0;padding:13px 16px;
+  background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(34,211,238,0.08));
+  border:1.5px solid rgba(59,130,246,0.5);
+  border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;
+  animation:pulse-border 2s ease-in-out infinite alternate;
+}
+#tts-banner.hidden{display:none}
+@keyframes pulse-border{
+  from{border-color:rgba(59,130,246,0.3);box-shadow:0 0 0 0 rgba(59,130,246,0)}
+  to  {border-color:rgba(59,130,246,0.8);box-shadow:0 0 16px rgba(59,130,246,0.25)}
+}
+
+/* ── CAMERA VIEW ── */
+#view-area{
+  position:relative;background:#000;
+  height:55vw;max-height:300px;min-height:220px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+#video{position:absolute;width:100%;height:100%;object-fit:cover}
+
+/* corner decorators */
+#view-area::before,#view-area::after{
+  content:'';position:absolute;width:24px;height:24px;z-index:5;
+  border-color:var(--cyan);border-style:solid;opacity:.8;
+}
+#view-area::before{top:10px;left:10px;border-width:2px 0 0 2px;border-radius:4px 0 0 0}
+#view-area::after {top:10px;right:10px;border-width:2px 2px 0 0;border-radius:0 4px 0 0}
+
+#view-corner-bl,#view-corner-br{
+  position:absolute;width:24px;height:24px;z-index:5;
+  border-color:var(--cyan);border-style:solid;opacity:.8;
+}
+#view-corner-bl{bottom:10px;left:10px;border-width:0 0 2px 2px;border-radius:0 0 0 4px}
+#view-corner-br{bottom:10px;right:10px;border-width:0 2px 2px 0;border-radius:0 0 4px 0}
+
+#cam-placeholder{text-align:center;z-index:1;padding:20px}
+#cam-placeholder .ph-icon{font-size:44px;display:block;margin-bottom:10px;opacity:.5}
+#cam-placeholder p{font-size:13px;color:var(--muted)}
+
+/* scan line */
+#scan-line{
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  z-index:4;display:none;
+  animation:scanDown 1.8s linear infinite;
+}
+@keyframes scanDown{from{top:0}to{top:100%}}
+@keyframes shimmer{0%{opacity:0}50%{opacity:1}100%{opacity:0}}
+
+/* dir overlay */
+#dir-overlay{
+  position:absolute;bottom:0;left:0;right:0;z-index:3;display:none;
+  background:linear-gradient(transparent,rgba(0,0,0,0.88));
+  padding:22px 16px 12px;text-align:center;
+}
+.dir-emoji{font-size:32px;line-height:1}
+.dir-text{font-size:15px;font-weight:800;margin-top:3px;letter-spacing:0.5px}
+
+/* ── STATUS BAR ── */
+#status-bar{
+  padding:8px 14px;
+  display:flex;align-items:center;gap:8px;
+  background:var(--s1);border-bottom:1px solid var(--border);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:#2a3550;flex-shrink:0;transition:background .3s}
+.dot.active{background:var(--green);animation:blink 1.5s infinite}
+.dot.busy{background:var(--amber);animation:blink .6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+#status-text{font-size:12px;color:var(--muted);flex:1}
+#tts-label{font-size:11px;color:var(--muted);transition:color .3s}
+#tts-label.on{color:var(--green)}
+
+/* ── RESULT BOX ── */
+#result-box{
+  margin:10px 14px;padding:18px 16px;
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(11,15,30,0.95),rgba(13,20,40,0.9));
+  border:1px solid var(--border);
+  min-height:115px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  transition:border-color .5s,box-shadow .5s;
+  position:relative;overflow:hidden;
+  backdrop-filter:blur(10px);
+}
+#result-box::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 0%,rgba(59,130,246,0.06),transparent 70%);
+  pointer-events:none;
+}
+#result-icon{font-size:30px;line-height:1;filter:drop-shadow(0 0 6px currentColor)}
+#result-main{font-size:19px;font-weight:800;text-align:center;line-height:1.2;letter-spacing:-0.3px}
+#result-detail{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;max-width:280px}
+#result-dir{
+  font-size:14px;font-weight:700;text-align:center;
+  padding:5px 14px;border-radius:20px;
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);
+  margin-top:2px;
+}
+
+/* ── GEMINI RAW ── */
+#gemini-raw{
+  margin:0 14px 10px;padding:10px 13px;
+  border-radius:12px;background:var(--s1);border:1px solid var(--border);
+  font-size:12px;line-height:1.7;color:#6a9abf;display:none;
+}
+.raw-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+
+/* ── CONTROLS ── */
+#controls{padding:6px 14px 16px;display:flex;gap:10px}
+#btn-start{
+  flex:1;border:none;border-radius:16px;padding:16px;
+  font-size:15px;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  background:linear-gradient(135deg,#1d4ed8,#3b82f6,#60a5fa);
+  color:#fff;box-shadow:0 6px 20px rgba(59,130,246,0.4),inset 0 1px 0 rgba(255,255,255,0.1);
+  transition:all .2s;letter-spacing:0.3px;
+}
+#btn-start:active{transform:scale(.97)}
+#btn-start.stop{
+  background:linear-gradient(135deg,#dc2626,#ef4444);
+  box-shadow:0 4px 15px rgba(239,68,68,0.35);
+}
+#btn-speak{
+  background:linear-gradient(135deg,rgba(34,211,238,0.1),rgba(59,130,246,0.08));
+  color:var(--cyan);
+  border:1px solid rgba(34,211,238,0.25);border-radius:16px;
+  padding:15px 20px;font-size:20px;cursor:pointer;
+  transition:all .2s;box-shadow:0 4px 12px rgba(0,0,0,0.3);
+}
+#btn-speak:disabled{opacity:.3}
+#btn-speak:active{transform:scale(.93)}
+#btn-speak.flash{background:rgba(34,197,94,0.15);border-color:var(--green);color:var(--green)}
+
+/* ── CARDS (shared) ── */
+.card{
+  margin:0 14px 12px;padding:14px 15px;
+  border-radius:14px;background:var(--s1);border:1px solid var(--border);
+}
+.card-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;font-weight:600}
+
+/* ── UPLOAD ── */
+#upload-tab{padding:14px;padding-bottom:30px}
+#drop-zone{
+  border:1.5px dashed var(--border);border-radius:16px;
+  padding:36px 16px;text-align:center;cursor:pointer;margin-bottom:12px;
+  transition:all .25s;background:var(--s1);
+}
+#drop-zone:active{border-color:var(--accent);background:rgba(59,130,246,0.05)}
+#drop-zone .dz-icon{font-size:40px;display:block;margin-bottom:10px;opacity:.7}
+#drop-zone .dz-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+#drop-zone .dz-sub{font-size:12px;color:var(--muted)}
+#file-input{display:none}
+#preview-img{width:100%;border-radius:14px;display:none;margin-bottom:12px;max-height:240px;object-fit:contain;background:#000;border:1px solid var(--border)}
+#btn-reset{display:none;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;margin-bottom:10px}
+#btn-analyze{width:100%;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;display:none;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 15px rgba(59,130,246,0.3)}
+#btn-analyze.show{display:flex}
+#upload-result{margin-top:12px;padding:14px;border-radius:14px;background:var(--s1);border:1px solid var(--border);display:none}
+#upload-result-main{font-size:17px;font-weight:700;margin-bottom:6px}
+#upload-result-detail{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* ── ESP32 ── */
+#esp32-tab{padding:14px;padding-bottom:30px}
+.esp-status{
+  display:flex;align-items:center;gap:12px;
+  padding:13px 15px;border-radius:14px;
+  background:var(--s1);border:1px solid var(--border);margin-bottom:12px;
+}
+.esp-dot{width:10px;height:10px;border-radius:50%;background:#2a3550;flex-shrink:0;transition:background .3s}
+.esp-dot.connected{background:var(--green);animation:blink 2s infinite}
+.esp-dot.error{background:var(--red)}
+.esp-dot.connecting{background:var(--amber);animation:blink .5s infinite}
+.esp-info{flex:1}
+.esp-info .esp-main{font-size:13px;font-weight:600}
+.esp-info .esp-sub{font-size:11px;color:var(--muted);margin-top:2px}
+#esp-fps{font-size:11px;color:var(--muted);font-family:monospace}
+.inp-row{margin-bottom:12px}
+.inp-row label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;font-weight:600}
+.inp-row input{width:100%;background:#070b14;color:var(--text);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;font-size:14px;font-family:monospace;outline:none;transition:border-color .2s}
+.inp-row input:focus{border-color:var(--accent)}
+.url-info{font-size:11px;color:var(--muted);background:#07090f;border-radius:10px;padding:10px 13px;margin-bottom:12px;line-height:1.9;border:1px solid var(--border)}
+.esp-btn{width:100%;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;transition:all .2s;letter-spacing:0.2px}
+.esp-btn:active{transform:scale(.97)}
+.esp-btn.primary{background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+.esp-btn.danger{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff}
+.esp-btn.secondary{background:var(--s2);color:var(--cyan);border:1px solid var(--border)}
+#esp-preview{width:100%;border-radius:14px;display:none;margin-bottom:12px;background:#000;max-height:220px;object-fit:contain;border:1px solid var(--border)}
+.esp-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.esp-stat{background:linear-gradient(145deg,var(--s1),#0a0e1a);border:1px solid var(--border);border-radius:14px;padding:14px 12px;text-align:center;position:relative;overflow:hidden}
+.esp-stat .val{font-size:20px;font-weight:800;color:var(--accent);font-family:monospace}
+.esp-stat .lbl{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.3px}
+.guide-box{margin-top:14px;padding:13px 14px;border-radius:12px;background:#07090f;border:1px solid var(--border);font-size:12px;line-height:2;color:var(--muted)}
+.guide-box .guide-title{color:var(--cyan);font-weight:700;margin-bottom:6px;font-size:12px}
+
+/* ── SETTINGS ── */
+#settings-tab{padding:14px;padding-bottom:30px}
+.srow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
+.slabel{font-size:14px;color:var(--muted)}
+select{background:#07090f;color:var(--text);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;outline:none}
+input[type=range]{width:100%;margin:10px 0 4px;accent-color:var(--accent)}
+.range-row{padding:12px 0;border-bottom:1px solid var(--border)}
+.range-label{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:2px}
+#freq-val{color:var(--accent);font-weight:700}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
+.toggle{position:relative;width:44px;height:24px}
+.toggle input{opacity:0;width:0;height:0}
+.slider-tgl{position:absolute;inset:0;background:#1e2d47;border-radius:24px;cursor:pointer;transition:.3s}
+.slider-tgl:before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+input:checked+.slider-tgl{background:var(--accent)}
+input:checked+.slider-tgl:before{transform:translateX(20px)}
+.key-section{padding:14px 0;border-bottom:1px solid var(--border)}
+.key-label{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+#key-badge{font-size:10px;padding:2px 8px;border-radius:10px;background:#3a1a1a;color:var(--red);font-weight:700}
+.key-input-row{display:flex;gap:8px}
+.key-input-row input{flex:1;background:#07090f;color:var(--text);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;font-family:monospace;outline:none;transition:border-color .2s}
+.key-input-row input:focus{border-color:var(--accent)}
+.key-input-row button{background:var(--s2);color:var(--cyan);border:1.5px solid var(--border);border-radius:10px;padding:8px 13px;font-size:16px;cursor:pointer}
+.key-hint{font-size:11px;color:var(--muted);margin-top:7px}
+.key-hint a{color:var(--accent);text-decoration:none}
+.info-card{margin-top:14px;padding:14px;border-radius:14px;background:#07090f;border:1px solid var(--border)}
+.info-card-title{font-size:11px;color:var(--cyan);font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px}
+.info-card p{font-size:11px;color:var(--muted);margin-bottom:4px;line-height:1.6}
+.info-card code{font-size:10px;color:#7eb8f7;word-break:break-all;display:block;margin-top:4px;padding:6px 8px;background:#0a1220;border-radius:6px;line-height:1.5}
+.test-voice-btn{
+  margin-top:14px;width:100%;
+  background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(34,211,238,0.1));
+  color:var(--cyan);border:1.5px solid rgba(59,130,246,0.3);
+  border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;
+  transition:all .2s;
+}
+.test-voice-btn:active{transform:scale(.97)}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <span id="header-logo">👁️</span>
+  <h1>Path Vision AI</h1>
+  <span id="header-badge">Gemini 3.5</span>
+</div>
+
+<div id="tabs">
+  <div class="tab active" id="tab-camera"   onclick="switchTab('camera')">📷 กล้อง</div>
+  <div class="tab"        id="tab-upload"   onclick="switchTab('upload')">📤 อัพโหลด</div>
+  <div class="tab"        id="tab-esp32"    onclick="switchTab('esp32')">📡 ESP32</div>
+  <div class="tab"        id="tab-settings" onclick="switchTab('settings')">⚙️ ตั้งค่า</div>
+</div>
+
+<!-- ═══ CAMERA ═══ -->
+<div id="panel-camera">
+
+  <div id="tts-banner" onclick="bannerTap()">🔊 แตะที่นี่เพื่อเปิดใช้งานเสียงพูด</div>
+
+  <div id="view-area">
+    <video id="video" autoplay playsinline muted></video>
+    <div id="scan-line"></div>
+    <div id="view-corner-bl"></div>
+    <div id="view-corner-br"></div>
+    <div id="cam-placeholder">
+      <span class="ph-icon">📵</span>
+      <p>กดปุ่มด้านล่างเพื่อเปิดกล้อง</p>
+    </div>
+    <div id="dir-overlay">
+      <div class="dir-emoji" id="ov-emoji"></div>
+      <div class="dir-text"  id="ov-text"></div>
+    </div>
+  </div>
+
+  <div id="status-bar">
+    <div class="dot" id="dot"></div>
+    <span id="status-text">พร้อมใช้งาน</span>
+    <span id="tts-label">🔇 เสียงปิด</span>
+  </div>
+
+  <div id="result-box">
+    <span id="result-icon">👁️</span>
+    <div id="result-main" style="color:var(--text)">รอการวิเคราะห์</div>
+    <div id="result-detail">ใส่ API Key แล้วกดเริ่มกล้อง</div>
+    <div id="result-dir"></div>
+  </div>
+
+  <div id="gemini-raw">
+    <div class="raw-label">Gemini raw output</div>
+    <div id="raw-text"></div>
+  </div>
+
+  <div id="controls">
+    <button id="btn-start" onclick="toggleCamera()">📷 เริ่มกล้อง</button>
+    <button id="btn-speak" onclick="speakNow()" disabled>🔊</button>
+  </div>
+</div>
+
+<!-- ═══ UPLOAD ═══ -->
+<div id="panel-upload">
+  <div id="upload-tab">
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <span class="dz-icon">📷</span>
+      <div class="dz-title">แตะเพื่อเลือกรูปภาพ</div>
+      <div class="dz-sub">รองรับ JPG · PNG · WebP</div>
+      <div style="margin-top:10px;font-size:11px;color:#2a3a5a;border:1px dashed #1e2d47;border-radius:8px;padding:5px 12px;display:inline-block">หรือลากวางรูปที่นี่</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" onchange="handleFile(event)">
+    <button id="btn-reset" onclick="resetUpload()">✕ เลือกรูปใหม่</button>
+    <img id="preview-img" alt="preview">
+    <button id="btn-analyze" onclick="analyzeUpload()">🔍 วิเคราะห์ด้วย Gemini</button>
+    <div id="upload-result">
+      <div id="upload-result-main"></div>
+      <div id="upload-result-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ESP32-CAM ═══ -->
+<div id="panel-esp32">
+  <div id="esp32-tab">
+    <div class="esp-status" id="esp-status-bar">
+      <div class="esp-dot" id="esp-dot"></div>
+      <div class="esp-info">
+        <div class="esp-main" id="esp-status-text">ยังไม่ได้เชื่อมต่อ</div>
+        <div class="esp-sub"  id="esp-status-sub">กรอก IP แล้วกดเชื่อมต่อ</div>
+      </div>
+      <span id="esp-fps"></span>
+    </div>
+
+    <div class="inp-row">
+      <label>🌐 IP Address ของ ESP32-CAM</label>
+      <input id="esp-ip" type="text" placeholder="192.168.1.xxx" oninput="saveEspIp(this.value)">
+    </div>
+
+    <div class="url-info">
+      📸 Snapshot: <code style="color:#7eb8f7" id="url-snap">http://[IP]/capture</code><br>
+      🎥 Stream:   <code style="color:#7eb8f7" id="url-stream">http://[IP]:81/stream</code>
+    </div>
+
+    <img id="esp-preview" alt="ESP32 preview">
+
+    <div class="esp-stat-grid">
+      <div class="esp-stat"><div class="val" id="esp-stat-frames">0</div><div class="lbl">ภาพวิเคราะห์</div></div>
+      <div class="esp-stat"><div class="val" id="esp-stat-ms">—</div><div class="lbl">ms/ภาพ</div></div>
+      <div class="esp-stat"><div class="val" id="esp-stat-ok">0</div><div class="lbl">สำเร็จ</div></div>
+      <div class="esp-stat"><div class="val" id="esp-stat-err">0</div><div class="lbl">ผิดพลาด</div></div>
+    </div>
+
+    <button class="esp-btn primary"   onclick="connectESP32()">📡 เชื่อมต่อ ESP32-CAM</button>
+    <button class="esp-btn secondary" onclick="testESP32Snap()">📸 ทดสอบถ่ายภาพ</button>
+    <button class="esp-btn danger" id="esp-stop-btn" onclick="stopESP32()" style="display:none">⏹ หยุด ESP32</button>
+
+    <div class="guide-box">
+      <div class="guide-title">📋 วิธีใช้ ESP32-CAM</div>
+      1. Flash ESP32-CAM ด้วย CameraWebServer sketch<br>
+      2. ต่อ WiFi เดียวกับมือถือ<br>
+      3. ดู Serial Monitor หา IP address<br>
+      4. กรอก IP ด้านบน → กดเชื่อมต่อ<br>
+      <span style="color:var(--amber)">⚠️ Android: chrome://flags → Allow insecure localhost</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div id="panel-settings">
+  <div id="settings-tab">
+
+    <!-- API Key -->
+    <div class="key-section">
+      <div class="key-label">
+        🔑 Gemini API Key
+        <span id="key-badge">ยังไม่มี</span>
+      </div>
+      <div class="key-input-row">
+        <input id="key-inp" type="password" placeholder="AQ.Ab8... หรือ AIzaSy..." oninput="onKeyInput(this.value)">
+        <button onclick="toggleKeyVis()">👁</button>
+      </div>
+      <div class="key-hint">สร้างฟรีที่ <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a> → Get API Key</div>
+    </div>
+
+    <!-- Model -->
+    <div class="srow">
+      <span class="slabel">โมเดล AI</span>
+      <select id="model-sel" onchange="onModelChange(this.value)">
+        <option value="gemini-3.5-flash">3.5 Flash ⚡ (แนะนำ/ฟรี)</option>
+        <option value="gemini-3-flash-preview">3 Flash ⚡ (ฟรี/Preview)</option>
+        <option value="gemini-3.1-flash-lite">3.1 Flash-Lite 🚀 (ฟรี/เร็ว)</option>
+        <option value="gemini-2.5-flash">2.5 Flash ⚡ (ฟรี)</option>
+        <option value="gemini-3.1-pro-preview">3.1 Pro 🎯 (จ่ายเงิน)</option>
+      </select>
+    </div>
+
+    <!-- Frequency -->
+    <div class="range-row">
+      <div class="range-label">
+        <span>ความถี่วิเคราะห์</span>
+        <span id="freq-val">3 วิ</span>
+      </div>
+      <input type="range" id="freq-slider" min="2" max="10" value="3" step="1"
+        oninput="document.getElementById('freq-val').textContent=this.value+' วิ'">
+    </div>
+
+    <!-- Language -->
+    <div class="srow">
+      <span class="slabel">ภาษาเสียง</span>
+      <select id="voice-lang">
+        <option value="th-TH">ภาษาไทย</option>
+        <option value="en-US">English</option>
+      </select>
+    </div>
+
+    <!-- Show raw -->
+    <div class="toggle-row">
+      <span class="slabel">แสดงผล Gemini ดิบ</span>
+      <label class="toggle">
+        <input type="checkbox" id="show-raw" onchange="toggleRaw()">
+        <span class="slider-tgl"></span>
+      </label>
+    </div>
+
+    <!-- Info -->
+    <div class="info-card">
+      <div class="info-card-title">ℹ️ API Info</div>
+      <p>ฟรี: 3.5 Flash · 3.1 Flash-Lite · 3 Flash Preview</p>
+      <p style="color:var(--amber)">⚠️ Gemini 2.0 ปิดตัวแล้ว 1 มิ.ย. 2026</p>
+      <p>429 → หยุดอัตโนมัติ 30 วิ แล้วรันต่อ</p>
+      <code id="info-endpoint">generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent</code>
+    </div>
+
+    <button class="test-voice-btn" onclick="testVoice()">🔊 ทดสอบเสียงพูด</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// CONFIG & KEY
+// ════════════════════════════════════════
+function getGeminiKey()   { return (localStorage.getItem('gk') || '').trim(); }
+function getGeminiModel() { return localStorage.getItem('gm') || 'gemini-3.5-flash'; }
+function getGeminiUrl()   {
+  return 'https://generativelanguage.googleapis.com/v1beta/models/'
+       + getGeminiModel() + ':generateContent?key=' + getGeminiKey();
+}
+
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+let streaming=false, mediaStream=null, timer=null;
+let lastSpeech='', lastSpeechTime=0, uploadFile=null;
+let ttsReady=false, audioCtx=null, _kaInterval=null;
+let showRaw=false, analyzing=false;
+let rateLimitUntil=0;
+const SPEECH_COOLDOWN=8000;
+const COLOR={safe:'#22c55e',warning:'#f59e0b',danger:'#ef4444'};
+const ICON ={safe:'✅',warning:'⚠️',danger:'🚧'};
+
+const video=document.getElementById('video');
+
+// ════════════════════════════════════════
+// TTS
+// ════════════════════════════════════════
+function getLang(){ return document.getElementById('voice-lang')?.value||'th-TH'; }
+
+function unlockAudioCtx(){
+  try{
+    if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    const b=audioCtx.createBuffer(1,4096,audioCtx.sampleRate);
+    const s=audioCtx.createBufferSource();s.buffer=b;s.connect(audioCtx.destination);s.start(0);
+  }catch(e){}
+}
+
+function unlockSpeech(cb){
+  if(!window.speechSynthesis){ttsReady=true;updateTTSStatus();cb&&cb();return;}
+  let done=false;
+  const finish=()=>{if(done)return;done=true;ttsReady=true;updateTTSStatus();document.getElementById('tts-banner').classList.add('hidden');cb&&cb();};
+  const u=new SpeechSynthesisUtterance('เปิด');
+  u.volume=0.01;u.rate=2;u.lang=getLang();
+  u.onend=finish;u.onerror=finish;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+  setTimeout(finish,1500);
+}
+
+function bannerTap(){
+  unlockAudioCtx();
+  unlockSpeech(()=>setTimeout(()=>rawSpeak('เปิดเสียงพูดแล้ว พร้อมใช้งาน'),300));
+}
+
+function updateTTSStatus(){
+  const el=document.getElementById('tts-label');
+  if(ttsReady){el.textContent='🔊 เสียงเปิด';el.classList.add('on');}
+  else{el.textContent='🔇 เสียงปิด';el.classList.remove('on');}
+}
+
+function rawSpeak(text){
+  if(!text||!window.speechSynthesis)return;
+  if(_kaInterval){clearInterval(_kaInterval);_kaInterval=null;}
+  window.speechSynthesis.cancel();
+  const lang=getLang();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=lang;u.rate=0.88;u.pitch=1;u.volume=1;
+  const voices=window.speechSynthesis.getVoices();
+  const code=lang.split('-')[0];
+  const v=voices.find(x=>x.lang===lang)||voices.find(x=>x.lang&&x.lang.startsWith(code));
+  if(v)u.voice=v;
+  try{if(window.speechSynthesis.paused)window.speechSynthesis.resume();}catch(e){}
+  window.speechSynthesis.speak(u);
+  _kaInterval=setInterval(()=>{
+    if(!window.speechSynthesis.speaking){clearInterval(_kaInterval);_kaInterval=null;return;}
+    try{if(window.speechSynthesis.paused)window.speechSynthesis.resume();}catch(e){}
+  },250);
+  const stop=()=>{if(_kaInterval){clearInterval(_kaInterval);_kaInterval=null;}};
+  u.onend=stop;u.onerror=stop;
+  setTimeout(stop,20000);
+}
+
+function speak(text){if(ttsReady&&text)rawSpeak(text);}
+
+function speakNow(){
+  const btn=document.getElementById('btn-speak');
+  btn.classList.add('flash');setTimeout(()=>btn.classList.remove('flash'),500);
+  if(!ttsReady){unlockAudioCtx();unlockSpeech(()=>setTimeout(()=>rawSpeak(lastSpeech||'พร้อมใช้งาน'),400));}
+  else rawSpeak(lastSpeech||'พร้อมใช้งาน');
+}
+
+function testVoice(){
+  unlockAudioCtx();
+  const msg=getLang().startsWith('th')?'ทดสอบเสียง Path Vision AI':'Testing Path Vision AI';
+  if(!ttsReady)unlockSpeech(()=>setTimeout(()=>rawSpeak(msg),400));
+  else rawSpeak(msg);
+}
+
+if(window.speechSynthesis){
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+}
+
+// ════════════════════════════════════════
+// SETTINGS KEY/MODEL
+// ════════════════════════════════════════
+function onKeyInput(val){
+  localStorage.setItem('gk',val.trim());
+  updateKeyBadge();
+}
+function toggleKeyVis(){
+  const inp=document.getElementById('key-inp');
+  if(inp)inp.type=inp.type==='password'?'text':'password';
+}
+function updateKeyBadge(){
+  const k=getGeminiKey();
+  const badge=document.getElementById('key-badge');
+  if(!badge)return;
+  if(!k){badge.textContent='ยังไม่มี';badge.style.cssText='font-size:10px;padding:2px 8px;border-radius:10px;background:#3a1a1a;color:var(--red);font-weight:700';}
+  else if(k.length<15){badge.textContent='⚠️ สั้นเกิน';badge.style.cssText='font-size:10px;padding:2px 8px;border-radius:10px;background:#3a2000;color:var(--amber);font-weight:700';}
+  else{badge.textContent='✅ พร้อมใช้';badge.style.cssText='font-size:10px;padding:2px 8px;border-radius:10px;background:#0a2a0a;color:var(--green);font-weight:700';}
+}
+function onModelChange(val){
+  localStorage.setItem('gm',val);
+  const names={'gemini-3.5-flash':'3.5 Flash','gemini-3-flash-preview':'3 Flash','gemini-3.1-flash-lite':'3.1 Flash-Lite','gemini-2.5-flash':'2.5 Flash','gemini-3.1-pro-preview':'3.1 Pro'};
+  const hm=document.getElementById('header-badge');
+  if(hm)hm.textContent='Gemini '+(names[val]||val);
+  const ep=document.getElementById('info-endpoint');
+  if(ep)ep.textContent='generativelanguage.googleapis.com/v1/models/'+val+':generateContent';
+}
+function toggleRaw(){
+  showRaw=document.getElementById('show-raw').checked;
+  document.getElementById('gemini-raw').style.display=(showRaw&&streaming)?'block':'none';
+}
+
+// ════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════
+function switchTab(t){
+  ['camera','upload','esp32','settings'].forEach(x=>{
+    document.getElementById('panel-'+x).style.display=x===t?'block':'none';
+    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  });
+}
+function setStatus(txt,state){
+  document.getElementById('status-text').textContent=txt;
+  const d=document.getElementById('dot');
+  d.className='dot';
+  if(state==='active')d.classList.add('active');
+  else if(state==='busy')d.classList.add('busy');
+}
+function setResult(p){
+  const color=COLOR[p.safety]||'#e8f0ff';
+  const icon=ICON[p.safety]||'👁️';
+  document.getElementById('result-icon').textContent=icon;
+  const m=document.getElementById('result-main');
+  m.textContent=p.hasPath?(getLang().startsWith('th')?'พบเส้นทาง':'Path Found'):(getLang().startsWith('th')?'ไม่พบเส้นทาง':'No Path');
+  m.style.color=color;
+  document.getElementById('result-detail').textContent=p.detail||'';
+  const rd=document.getElementById('result-dir');
+  if(p.dirEmoji&&p.direction){rd.textContent=p.dirEmoji+' '+p.direction;rd.style.color=color;}else rd.textContent='';
+  const rb=document.getElementById('result-box');
+  rb.style.borderColor=p.safety==='safe'?'rgba(34,197,94,0.3)':p.safety==='warning'?'rgba(245,158,11,0.3)':'rgba(239,68,68,0.3)';
+  rb.style.boxShadow=p.safety==='safe'?'0 0 20px rgba(34,197,94,0.08)':p.safety==='warning'?'0 0 20px rgba(245,158,11,0.08)':'0 0 20px rgba(239,68,68,0.08)';
+  // dir overlay
+  const ov=document.getElementById('dir-overlay');
+  if(streaming&&p.dirEmoji){
+    document.getElementById('ov-emoji').textContent=p.dirEmoji;
+    const ot=document.getElementById('ov-text');ot.textContent=p.direction||'';ot.style.color=color;
+    ov.style.display='block';
+  }else ov.style.display='none';
+}
+
+// ════════════════════════════════════════
+// PROMPT
+// ════════════════════════════════════════
+function buildPrompt(lang){
+  const th=lang.startsWith('th');
+  if(th)return`คุณเป็น AI ช่วยนำทางสำหรับผู้พิการทางสายตา วิเคราะห์ภาพแล้วตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น
+
+ตอบในรูปแบบนี้:
+{
+  "hasPath": true หรือ false,
+  "pathZone": "left" หรือ "center" หรือ "right" หรือ "none",
+  "obstacles": ["รายการสิ่งกีดขวาง"],
+  "obstacleZones": ["left", "center", หรือ "right"],
+  "direction": "เดินตรง" หรือ "เลี้ยวซ้าย" หรือ "เลี้ยวขวา" หรือ "หยุด" หรือ "ระวังซ้าย" หรือ "ระวังขวา",
+  "dirEmoji": "⬆️" หรือ "⬅️" หรือ "➡️" หรือ "🛑" หรือ "↖️" หรือ "↗️",
+  "safety": "safe" หรือ "warning" หรือ "danger",
+  "speech": "ประโยคภาษาไทยสั้นสำหรับพูดออกเสียง ไม่เกิน 2 ประโยค",
+  "detail": "คำอธิบายสั้น ภาษาไทย"
+}
+
+กฎ:
+- ถ้าไม่เห็นเส้นทางชัดเจน ให้ hasPath=false และถือทุกสิ่งเป็นสิ่งกีดขวาง
+- pathZone คือตำแหน่งเส้นทางในภาพ`;
+  return`You are an AI navigation assistant for visually impaired people. Analyze the image and respond ONLY with JSON.
+
+{
+  "hasPath": true or false,
+  "pathZone": "left" or "center" or "right" or "none",
+  "obstacles": ["list"],
+  "obstacleZones": ["left", "center", or "right"],
+  "direction": "go straight" or "turn left" or "turn right" or "stop" or "watch left" or "watch right",
+  "dirEmoji": "⬆️" or "⬅️" or "➡️" or "🛑" or "↖️" or "↗️",
+  "safety": "safe" or "warning" or "danger",
+  "speech": "Short spoken English, max 2 sentences",
+  "detail": "Brief description"
+}
+
+Rules: If no clear walkable path, set hasPath=false and treat everything as obstacles.`;
+}
+
+// ════════════════════════════════════════
+// GEMINI API
+// ════════════════════════════════════════
+async function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+async function callGemini(b64,mime){
+  const key=getGeminiKey();
+  if(!key||key.length<15)throw new Error('NO_KEY');
+  if(Date.now()<rateLimitUntil)throw new Error('rate_limit:'+Math.ceil((rateLimitUntil-Date.now())/1000));
+
+  const body={
+    contents:[{parts:[{text:buildPrompt(getLang())},{inline_data:{mime_type:mime,data:b64}}]}],
+    generationConfig:{temperature:0.1,maxOutputTokens:512,responseMimeType:'application/json'}
+  };
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),15000);
+  let res;
+  try{
+    res=await fetch(getGeminiUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:ctrl.signal});
+  }catch(e){
+    clearTimeout(tid);
+    throw new Error(e.name==='AbortError'?'หมดเวลา (timeout 15 วิ)':'เชื่อมต่อไม่ได้');
+  }finally{clearTimeout(tid);}
+
+  if(res.status===429){rateLimitUntil=Date.now()+30000;throw new Error('rate_limit:30');}
+  if(!res.ok){
+    let msg=`Gemini error ${res.status}`;
+    try{const j=await res.json();msg=j?.error?.message||msg;}catch(_){}
+    throw new Error(msg.substring(0,100));
+  }
+
+  const data=await res.json();
+  const raw=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+  if(!raw)throw new Error('Gemini ตอบกลับว่างเปล่า');
+  return raw;
+}
+
+function parseGemini(raw){
+  try{
+    return JSON.parse(raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim());
+  }catch(e){
+    return{hasPath:false,pathZone:'none',obstacles:[],obstacleZones:[],direction:'หยุด',dirEmoji:'⚠️',safety:'warning',speech:'ไม่สามารถอ่านผลได้ กรุณาลองใหม่',detail:'Parse error'};
+  }
+}
+
+// ════════════════════════════════════════
+// CAMERA
+// ════════════════════════════════════════
+async function toggleCamera(){streaming?stopCamera():await startCamera();}
+
+async function startCamera(){
+  if(!ttsReady)document.getElementById('tts-banner').classList.remove('hidden');
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=mediaStream;await video.play();
+    document.getElementById('cam-placeholder').style.display='none';
+    streaming=true;
+    document.getElementById('btn-start').textContent='⏹ หยุด';
+    document.getElementById('btn-start').classList.add('stop');
+    document.getElementById('btn-speak').disabled=false;
+    if(showRaw)document.getElementById('gemini-raw').style.display='block';
+    setStatus('กำลังทำงาน','active');
+    scheduleSnap(1000);
+  }catch(e){
+    alert('ไม่สามารถเปิดกล้องได้\n\nกรุณาอนุญาต Camera permission\n\n'+e.message);
+  }
+}
+
+function stopCamera(){
+  clearTimeout(timer);
+  if(mediaStream)mediaStream.getTracks().forEach(t=>t.stop());
+  mediaStream=null;streaming=false;analyzing=false;
+  document.getElementById('btn-start').textContent='📷 เริ่มกล้อง';
+  document.getElementById('btn-start').classList.remove('stop');
+  document.getElementById('btn-speak').disabled=true;
+  document.getElementById('cam-placeholder').style.display='block';
+  document.getElementById('dir-overlay').style.display='none';
+  document.getElementById('scan-line').style.display='none';
+  document.getElementById('gemini-raw').style.display='none';
+  setStatus('หยุดแล้ว','');
+}
+
+function getFreqMs(){const v=parseInt(document.getElementById('freq-slider')?.value);return(isNaN(v)?3:v)*1000;}
+function scheduleSnap(delay){
+  timer=setTimeout(async()=>{
+    if(!streaming)return;
+    await snap();
+    if(streaming)scheduleSnap(getFreqMs());
+  },delay!=null?delay:getFreqMs());
+}
+
+async function snap(){
+  if(!streaming||video.readyState<2||analyzing)return;
+  if(!video.videoWidth||!video.videoHeight)return;
+  analyzing=true;
+  setStatus('กำลังวิเคราะห์...','busy');
+  document.getElementById('scan-line').style.display='block';
+  try{
+    const c=document.createElement('canvas');
+    const maxW=800,ratio=Math.min(maxW/(video.videoWidth||640),1);
+    c.width=Math.round((video.videoWidth||640)*ratio);
+    c.height=Math.round((video.videoHeight||480)*ratio);
+    c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+    const b64=await new Promise((res,rej)=>{
+      c.toBlob(blob=>{
+        if(!blob){rej(new Error('ไม่สามารถสร้างภาพได้'));return;}
+        const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);
+      },'image/jpeg',0.8);
+    });
+    const raw=await callGemini(b64,'image/jpeg');
+    const parsed=parseGemini(raw);
+    if(showRaw)document.getElementById('raw-text').textContent=raw;
+    setResult(parsed);
+    const now=Date.now();
+    if(parsed.speech&&(parsed.speech!==lastSpeech||(now-lastSpeechTime)>SPEECH_COOLDOWN)){
+      lastSpeech=parsed.speech;lastSpeechTime=now;speak(parsed.speech);
+    }
+    setStatus('กำลังทำงาน','active');
+  }catch(e){
+    if(e.message==='NO_KEY'){setStatus('❌ กรุณาใส่ API Key ใน ⚙️ ตั้งค่า','');if(streaming)stopCamera();}
+    else if(e.message?.startsWith('rate_limit:')){const s=e.message.split(':')[1];setStatus('⏳ Quota เต็ม รอ '+s+' วิ','busy');}
+    else setStatus('❌ '+(e.message||'').substring(0,70),'');
+  }finally{
+    analyzing=false;document.getElementById('scan-line').style.display='none';
+  }
+}
+
+// ════════════════════════════════════════
+// UPLOAD
+// ════════════════════════════════════════
+let previewURL=null;
+function loadImageFile(f){
+  uploadFile=f;
+  if(previewURL){URL.revokeObjectURL(previewURL);previewURL=null;}
+  previewURL=URL.createObjectURL(f);
+  const img=document.getElementById('preview-img');
+  img.src=previewURL;img.style.display='block';
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('btn-reset').style.display='inline-block';
+  document.getElementById('btn-analyze').classList.add('show');
+  document.getElementById('upload-result').style.display='none';
+}
+function handleFile(e){const f=e.target.files[0];if(f)loadImageFile(f);}
+function resetUpload(){
+  uploadFile=null;
+  if(previewURL){URL.revokeObjectURL(previewURL);previewURL=null;}
+  document.getElementById('preview-img').style.display='none';
+  document.getElementById('drop-zone').style.display='block';
+  document.getElementById('btn-reset').style.display='none';
+  document.getElementById('btn-analyze').classList.remove('show');
+  document.getElementById('upload-result').style.display='none';
+  document.getElementById('file-input').value='';
+}
+async function analyzeUpload(){
+  if(!uploadFile)return;
+  const btn=document.getElementById('btn-analyze');
+  btn.textContent='⏳ กำลังวิเคราะห์...';btn.disabled=true;
+  const snap=uploadFile;
+  document.getElementById('upload-result').style.display='block';
+  document.getElementById('upload-result-main').textContent='⏳ รอ Gemini...';
+  document.getElementById('upload-result-detail').textContent='';
+  try{
+    const b64=await blobToBase64(snap);
+    const raw=await callGemini(b64,snap.type||'image/jpeg');
+    const p=parseGemini(raw);
+    const color=COLOR[p.safety]||'#e8f0ff',icon=ICON[p.safety]||'👁️';
+    const m=document.getElementById('upload-result-main');
+    m.textContent=icon+' '+(p.hasPath?(getLang().startsWith('th')?'พบเส้นทาง':'Path Found'):(getLang().startsWith('th')?'ไม่พบเส้นทาง':'No Path'));
+    m.style.color=color;
+    document.getElementById('upload-result-detail').innerHTML=
+      (p.dirEmoji?p.dirEmoji+' ':'')+`<strong>${p.direction||''}</strong><br>${p.detail||''}`
+      +(p.obstacles?.length?`<br><small style="color:var(--muted)">พบ: ${p.obstacles.join(', ')}</small>`:'');
+    speak(p.speech);
+  }catch(e){
+    document.getElementById('upload-result-main').textContent='⚠️ เกิดข้อผิดพลาด';
+    const short=e.message==='NO_KEY'?'กรุณาใส่ API Key ใน ⚙️ ตั้งค่า':e.message?.startsWith('rate_limit:')?'Quota เต็ม รอแล้วลองใหม่':(e.message||'').substring(0,100);
+    document.getElementById('upload-result-detail').textContent=short;
+  }finally{btn.textContent='🔍 วิเคราะห์ด้วย Gemini';btn.disabled=false;}
+}
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>e.preventDefault());
+dz.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadImageFile(f);});
+
+// ════════════════════════════════════════
+// ESP32-CAM
+// ════════════════════════════════════════
+let espStreaming=false,espTimer=null,espAnalyzing=false;
+let espFrames=0,espOk=0,espErr=0;
+
+function saveEspIp(v){localStorage.setItem('esp_ip',v.trim());updateEspUrls(v.trim());}
+function getEspIp(){return(localStorage.getItem('esp_ip')||'').trim();}
+function updateEspUrls(ip){
+  const s=document.getElementById('url-snap'),t=document.getElementById('url-stream');
+  if(s)s.textContent=ip?`http://${ip}/capture`:'http://[IP]/capture';
+  if(t)t.textContent=ip?`http://${ip}:81/stream`:'http://[IP]:81/stream';
+}
+function setEspStatus(text,sub,state){
+  const dot=document.getElementById('esp-dot'),txt=document.getElementById('esp-status-text'),stxt=document.getElementById('esp-status-sub');
+  if(dot){dot.className='esp-dot';if(state)dot.classList.add(state);}
+  if(txt)txt.textContent=text;if(stxt)stxt.textContent=sub||'';
+}
+function updateEspStats(){
+  document.getElementById('esp-stat-frames').textContent=espFrames;
+  document.getElementById('esp-stat-ok').textContent=espOk;
+  document.getElementById('esp-stat-err').textContent=espErr;
+}
+async function fetchESP32Frame(ip){
+  const url=`http://${ip}/capture?t=${Date.now()}`;
+  const ctrl=new AbortController();const tid=setTimeout(()=>ctrl.abort(),8000);
+  try{
+    const res=await fetch(url,{signal:ctrl.signal,cache:'no-store'});
+    clearTimeout(tid);
+    if(!res.ok)throw new Error(`ESP32 HTTP ${res.status}`);
+    const blob=await res.blob();
+    if(!blob||blob.size<100)throw new Error('ESP32 ส่งภาพว่าง');
+    return blob;
+  }catch(e){clearTimeout(tid);throw e.name==='AbortError'?new Error('ESP32 timeout'):e;}
+}
+async function connectESP32(){
+  const ip=getEspIp();
+  if(!ip){alert('กรุณากรอก IP ก่อนครับ');return;}
+  setEspStatus('กำลังเชื่อมต่อ...',`http://${ip}/capture`,'connecting');
+  try{
+    const b=await fetchESP32Frame(ip);
+    const prev=document.getElementById('esp-preview');
+    if(prev){const u=URL.createObjectURL(b);prev.src=u;prev.style.display='block';prev.onload=()=>URL.revokeObjectURL(u);}
+    espStreaming=true;espFrames=0;espOk=0;espErr=0;
+    document.getElementById('esp-stop-btn').style.display='block';
+    setEspStatus('✅ เชื่อมต่อสำเร็จ','กำลังวิเคราะห์...','connected');
+    updateEspStats();scheduleEspSnap(500);
+  }catch(e){setEspStatus('❌ เชื่อมต่อไม่ได้',e.message,'error');}
+}
+function stopESP32(){
+  espStreaming=false;if(espTimer){clearTimeout(espTimer);espTimer=null;}espAnalyzing=false;
+  document.getElementById('esp-stop-btn').style.display='none';
+  document.getElementById('esp-fps').textContent='';
+  setEspStatus('หยุดแล้ว','','');
+}
+function scheduleEspSnap(delay){
+  espTimer=setTimeout(async()=>{if(!espStreaming)return;await snapESP32();if(espStreaming)scheduleEspSnap(getFreqMs());},delay!=null?delay:getFreqMs());
+}
+async function snapESP32(){
+  if(!espStreaming||espAnalyzing)return;
+  const ip=getEspIp();if(!ip){stopESP32();return;}
+  espAnalyzing=true;const t0=Date.now();
+  try{
+    const blob=await fetchESP32Frame(ip);
+    const prev=document.getElementById('esp-preview');
+    if(prev){const oldSrc=prev.src;const nu=URL.createObjectURL(blob);prev.src=nu;prev.style.display='block';prev.onload=()=>{URL.revokeObjectURL(nu);if(oldSrc?.startsWith('blob:'))URL.revokeObjectURL(oldSrc);};}
+    const b64=await blobToBase64(blob);
+    const raw=await callGemini(b64,'image/jpeg');
+    const p=parseGemini(raw);
+    espFrames++;espOk++;
+    const ms=Date.now()-t0;
+    document.getElementById('esp-stat-ms').textContent=ms;
+    document.getElementById('esp-fps').textContent=ms+'ms';
+    updateEspStats();
+    setEspStatus('✅ กำลังทำงาน',p.direction||'','connected');
+    setResult(p);
+    const now=Date.now();
+    if(p.speech&&(p.speech!==lastSpeech||(now-lastSpeechTime)>SPEECH_COOLDOWN)){lastSpeech=p.speech;lastSpeechTime=now;speak(p.speech);}
+  }catch(e){
+    espFrames++;espErr++;updateEspStats();
+    const s=e.message?.startsWith('rate_limit:')?'Quota เต็ม':(e.message||'').substring(0,50);
+    setEspStatus('⚠️ '+s,'','error');
+  }finally{espAnalyzing=false;}
+}
+async function testESP32Snap(){
+  const ip=getEspIp();if(!ip){alert('กรุณากรอก IP ก่อนครับ');return;}
+  setEspStatus('กำลังทดสอบ...','','connecting');
+  try{
+    const b=await fetchESP32Frame(ip);
+    const prev=document.getElementById('esp-preview');
+    if(prev){const u=URL.createObjectURL(b);prev.src=u;prev.style.display='block';prev.onload=()=>URL.revokeObjectURL(u);}
+    setEspStatus('✅ ถ่ายภาพได้',`${(b.size/1024).toFixed(1)} KB — พร้อมเชื่อมต่อ`,'connected');
+  }catch(e){setEspStatus('❌ '+e.message.substring(0,60),'ตรวจสอบ IP และ WiFi','error');}
+}
+
+// ════════════════════════════════════════
+// VISIBILITY + INIT
+// ════════════════════════════════════════
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    if(timer){clearTimeout(timer);timer=null;}
+    if(espTimer){clearTimeout(espTimer);espTimer=null;}
+  }else{
+    if(streaming&&!timer){analyzing=false;scheduleSnap(1500);}
+    if(espStreaming&&!espTimer){espAnalyzing=false;scheduleEspSnap(1500);}
+  }
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  // key
+  const savedKey=getGeminiKey();
+  const keyInp=document.getElementById('key-inp');
+  if(keyInp&&savedKey)keyInp.value=savedKey;
+  updateKeyBadge();
+  // model — ล้างโมเดลเก่าที่ไม่รองรับแล้ว
+  const validModels=['gemini-3.5-flash','gemini-3-flash-preview','gemini-3.1-flash-lite','gemini-2.5-flash','gemini-3.1-pro-preview'];
+  const storedModel=localStorage.getItem('gm');
+  if(storedModel && !validModels.includes(storedModel)){localStorage.setItem('gm','gemini-3.5-flash');}
+  // model
+  const savedModel=getGeminiModel();
+  const modelSel=document.getElementById('model-sel');
+  if(modelSel){modelSel.value=savedModel;onModelChange(savedModel);}
+  // freq
+  const savedFreq=localStorage.getItem('freq');
+  if(savedFreq){const fs=document.getElementById('freq-slider');if(fs){fs.value=savedFreq;document.getElementById('freq-val').textContent=savedFreq+' วิ';}}
+  // esp32
+  const savedIp=getEspIp();
+  const espInp=document.getElementById('esp-ip');
+  if(espInp&&savedIp)espInp.value=savedIp;
+  updateEspUrls(savedIp);
+});
+
+// save freq on change
+document.getElementById('freq-slider').addEventListener('change',e=>localStorage.setItem('freq',e.target.value));
+</script>
+</body>
+</html>
