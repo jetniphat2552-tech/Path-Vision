@@ -905,8 +905,13 @@ dz.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0
 let espStreaming=false,espTimer=null,espAnalyzing=false;
 let espFrames=0,espOk=0,espErr=0;
 
-function saveEspIp(v){localStorage.setItem('esp_ip',v.trim());updateEspUrls(v.trim());}
-function getEspIp(){return(localStorage.getItem('esp_ip')||'').trim();}
+function saveEspIp(v){
+  const clean=v.trim().replace(/^https?:\/\//i,'').replace(/\/$/,'');
+  localStorage.setItem('esp_ip',clean);updateEspUrls(clean);
+  const inp=document.getElementById('esp-ip');
+  if(inp&&inp.value!==clean)inp.value=clean;
+}
+function getEspIp(){return(localStorage.getItem('esp_ip')||'').trim().replace(/^https?:\/\//i,'').replace(/\/$/,'');}
 function updateEspUrls(ip){
   const s=document.getElementById('url-snap'),t=document.getElementById('url-stream');
   if(s)s.textContent=ip?`http://${ip}/capture`:'http://[IP]/capture';
