@@ -329,6 +329,7 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
 
   <div id="view-area">
     <video id="video" autoplay playsinline muted></video>
+    <img id="esp-stream-img" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;border-radius:inherit" alt="ESP32 Stream">
     <div id="scan-line"></div>
     <div id="view-corner-bl"></div>
     <div id="view-corner-br"></div>
@@ -807,17 +808,25 @@ async function startCamera(){
   if(camSource==='esp32'){
     const ip=getEspIp();
     if(!ip){alert('กรุณากรอก IP ของ ESP32-CAM ก่อนครับ');return;}
-    // ทดสอบเชื่อมต่อก่อน
     setStatus('กำลังเชื่อมต่อ ESP32...','busy');
-    try{await fetchESP32Frame(ip);}
-    catch(e){setStatus('❌ เชื่อมต่อ ESP32 ไม่ได้: '+e.message,'');return;}
+    // ใช้ MJPEG stream — เนียน ไม่กระตุก
+    const streamImg=document.getElementById('esp-stream-img');
+    const streamUrl='http://'+ip+':81/stream';
+    streamImg.src=streamUrl;
+    streamImg.style.display='block';
+    document.getElementById('video').style.display='none';
+    streamImg.onerror=()=>{
+      setStatus('❌ เชื่อมต่อ stream ไม่ได้ ลอง /capture แทน','');
+      streamImg.style.display='none';
+    };
+    streamImg.onload=()=>{setStatus('กำลังทำงาน (ESP32 Stream)','active');};
     document.getElementById('cam-placeholder').style.display='none';
     streaming=true;
     document.getElementById('btn-start').textContent='⏹ หยุด';
     document.getElementById('btn-start').classList.add('stop');
     document.getElementById('btn-speak').disabled=false;
-    setStatus('กำลังทำงาน (ESP32)','active');
-    scheduleSnap(1000);
+    setStatus('กำลังเชื่อมต่อ stream...','busy');
+    scheduleSnap(getFreqMs());
     return;
   }
   try{
@@ -840,6 +849,7 @@ function stopCamera(){
   clearTimeout(timer);
   if(mediaStream)mediaStream.getTracks().forEach(t=>t.stop());
   mediaStream=null;streaming=false;analyzing=false;
+  const si=document.getElementById('esp-stream-img');if(si){si.src='';si.style.display='none';}
   const li=document.getElementById('esp-cam-live');if(li)li.remove();
   document.getElementById('btn-start').textContent='📷 เริ่มกล้อง';
   document.getElementById('btn-start').classList.remove('stop');
@@ -869,21 +879,28 @@ async function snap(){
     let b64;
     if(camSource==='esp32'){
       const ip=getEspIp();
-      const blob=await fetchESP32Frame(ip);
-      // แสดงภาพ ESP32 ใน view-area
-      const imgId='esp-cam-live';
-      let liveImg=document.getElementById(imgId);
-      if(!liveImg){
-        liveImg=document.createElement('img');liveImg.id=imgId;
-        liveImg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;border-radius:inherit';
-        document.getElementById('view-area').appendChild(liveImg);
+      // วิธี 1: วาด MJPEG stream img ลง canvas (เร็ว ไม่ต้อง fetch ซ้ำ)
+      const streamImg=document.getElementById('esp-stream-img');
+      let b64Ok=false;
+      if(streamImg&&streamImg.complete&&streamImg.naturalWidth>0){
+        try{
+          const c=document.createElement('canvas');
+          c.width=streamImg.naturalWidth||640;c.height=streamImg.naturalHeight||480;
+          c.getContext('2d').drawImage(streamImg,0,0,c.width,c.height);
+          b64=await new Promise((res,rej)=>{c.toBlob(bl=>{
+            if(!bl){rej(new Error('canvas empty'));return;}
+            const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(bl);
+          },'image/jpeg',0.85);});
+          b64Ok=true;
+        }catch(_){}
       }
-      const url=URL.createObjectURL(blob);
-      liveImg.src=url;
-      liveImg.onload=()=>URL.revokeObjectURL(url);
-      b64=await new Promise((res,rej)=>{
-        const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);
-      });
+      // วิธี 2: fallback fetch /capture ถ้า stream ยังไม่พร้อม
+      if(!b64Ok){
+        const blob=await fetchESP32Frame(ip);
+        b64=await new Promise((res,rej)=>{
+          const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob);
+        });
+      }
     } else {
       if(video.readyState<2||!video.videoWidth||!video.videoHeight){analyzing=false;return;}
       const c=document.createElement('canvas');
