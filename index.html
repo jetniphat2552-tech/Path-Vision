@@ -424,6 +424,10 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
 
     <div class="guide-box">
       <div class="guide-title">📳 ระบบ ERM Vibration Motor</div>
+      <div class="inp-row">
+        <label>🌐 IP Address ของ ESP32 Dev (Motor)</label>
+        <input id="esp-ip-motor" type="text" placeholder="192.168.1.xxx" oninput="saveMotorIp(this.value)">
+      </div>
       <div id="vib-status" style="font-size:13px;color:var(--muted);margin-bottom:8px">สถานะ: ไม่ได้เชื่อมต่อ</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         <button class="esp-btn secondary" onclick="testVib('front')" style="font-size:13px">⬆️ หน้า</button>
@@ -439,11 +443,11 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
       <div class="guide-title">📋 วิธีใช้ ESP32-CAM</div>
       <div class="guide-title" style="margin-top:12px">📟 Arduino Code สำหรับ ERM Motor</div>
       <pre style="font-size:10px;background:#070b14;border-radius:8px;padding:10px;overflow-x:auto;color:#7dd3fc;border:1px solid var(--border);white-space:pre-wrap;word-break:break-all">// Motor pins: ต่อ ERM motor ผ่าน transistor หรือ L293D
-// front=GPIO12, back=GPIO13, left=GPIO14, right=GPIO27
+// front=GPIO17, back=GPIO5, left=GPIO18, right=GPIO19
 #include &lt;WiFi.h&gt;
 #include &lt;WebServer.h&gt;
 WebServer server(80);
-const int MOTOR[]={12,13,14,27}; // F,B,L,R
+const int MOTOR[]={17,5,18,19}; // F,B,L,R
 const char* SSID="your_wifi";
 const char* PASS="your_password";
 void vibrate(int pin,int dur){
@@ -454,10 +458,10 @@ void setup(){
   server.on("/vibrate",[](){
     String dir=server.arg("dir");
     int dur=server.arg("duration").toInt();if(!dur)dur=300;
-    if(dir=="front")vibrate(12,dur);
-    else if(dir=="back")vibrate(13,dur);
-    else if(dir=="left")vibrate(14,dur);
-    else if(dir=="right")vibrate(27,dur);
+    if(dir=="front")vibrate(17,dur);
+    else if(dir=="back")vibrate(5,dur);
+    else if(dir=="left")vibrate(18,dur);
+    else if(dir=="right")vibrate(19,dur);
     else for(int p:MOTOR)digitalWrite(p,LOW);
     server.send(200,"text/plain","ok");});
   server.begin();}
@@ -727,8 +731,12 @@ let lastVibDir='';
 let vibEnabled=localStorage.getItem('vib_enabled')!=='false'; // default true
 
 async function sendVibrate(dir,duration=300){
-  const ip=getEspIp();
-  if(!ip||!vibEnabled)return;
+  const ip=getMotorIp();
+  if(!ip||!vibEnabled){
+    const el=document.getElementById('vib-status');
+    if(el&&!ip)el.textContent='สถานะ: กรุณากรอก IP ของ ESP32 Dev (Motor)';
+    return;
+  }
   try{
     const url=`http://${ip}/vibrate?dir=${dir}&duration=${duration}`;
     await fetch(url,{signal:AbortSignal.timeout(1500)});
@@ -745,7 +753,7 @@ function testVib(dir){sendVibrate(dir,500);}
 // แปลง direction/obstacleZones เป็น vibration pattern
 function vibrateFromResult(p){
   if(!vibEnabled)return;
-  const ip=getEspIp();
+  const ip=getMotorIp();
   if(!ip)return;
 
   if(p.safety==='safe'){
@@ -1106,6 +1114,13 @@ function saveEspIp(v){
   if(inp&&inp.value!==clean)inp.value=clean;
 }
 function getEspIp(){return(localStorage.getItem('esp_ip')||'').trim().replace(/^https?:\/\//i,'').replace(/\/$/,'');}
+function saveMotorIp(v){
+  const clean=v.trim().replace(/^https?:\/\//i,'').replace(/\/$/,'');
+  localStorage.setItem('motor_ip',clean);
+  const inp=document.getElementById('esp-ip-motor');
+  if(inp&&inp.value!==clean)inp.value=clean;
+}
+function getMotorIp(){return(localStorage.getItem('motor_ip')||'').trim().replace(/^https?:\/\//i,'').replace(/\/$/,'');}
 function updateEspUrls(ip){
   const s=document.getElementById('url-snap'),t=document.getElementById('url-stream');
   if(s)s.textContent=ip?`http://${ip}/capture`:'http://[IP]/capture';
@@ -1231,6 +1246,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   const espInp=document.getElementById('esp-ip');
   if(espInp&&savedIp)espInp.value=savedIp;
   updateEspUrls(savedIp);
+  // motor ip
+  const savedMotorIp=getMotorIp();
+  const motorInp=document.getElementById('esp-ip-motor');
+  if(motorInp&&savedMotorIp)motorInp.value=savedMotorIp;
 });
 
 // save freq on change
