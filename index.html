@@ -302,7 +302,7 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
  <button id="src-esp32" class="src-btn" onclick="setCamSource('esp32')"> ESP32-CAM</button>
  </div>
  <div id="esp-ip-inline" style="display:none;padding:0 14px 8px">
- <input id="esp-ip-cam" type="text" placeholder="192.168.1.63" style="width:100%;background:#070b14;color:var(--text);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;font-family:monospace;outline:none;box-sizing:border-box" oninput="syncEspIp(this.value)">
+ <input id="esp-ip-cam" type="text" placeholder="192.168.1.63" style="width:100%;background:#ffffff;color:#1c1e21;border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;font-family:monospace;outline:none;box-sizing:border-box" oninput="syncEspIp(this.value)">
  </div>
 
  <div id="view-area">
@@ -341,7 +341,7 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
 
  <div id="controls">
  <button id="btn-start" onclick="toggleCamera()"> เริ่มกล้อง</button>
- <button id="btn-speak" onclick="speakNow()" disabled></button>
+ <button id="btn-speak" onclick="speakNow()" disabled>🔊</button>
  </div>
 </div>
 
@@ -753,7 +753,7 @@ async function startCamera(){
  streamImg.onload=()=>{setStatus('กำลังทำงาน (ESP32 Stream)','active');};
  document.getElementById('cam-placeholder').style.display='none';
  streaming=true;
- document.getElementById('btn-start').textContent='⏹ หยุด';
+ document.getElementById('btn-start').textContent='หยุด';
  document.getElementById('btn-start').classList.add('stop');
  document.getElementById('btn-speak').disabled=false;
  setStatus('กำลังเชื่อมต่อ stream...','busy');
@@ -765,7 +765,7 @@ async function startCamera(){
  video.srcObject=mediaStream;await video.play();
  document.getElementById('cam-placeholder').style.display='none';
  streaming=true;
- document.getElementById('btn-start').textContent='⏹ หยุด';
+ document.getElementById('btn-start').textContent='หยุด';
  document.getElementById('btn-start').classList.add('stop');
  document.getElementById('btn-speak').disabled=false;
  if(showRaw)document.getElementById('gemini-raw').style.display='block';
