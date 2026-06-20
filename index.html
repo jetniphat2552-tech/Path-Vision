@@ -7,18 +7,13 @@
 <style>
 :root {
  --bg: #f0f2f5;
- --s1: #ffffff;
- --s2: #e4e6ea;
  --border: #dadde1;
  --accent: #1877f2;
- --cyan: #1877f2;
  --green: #42b72a;
  --red: #fa3e3e;
  --amber: #f0a500;
- --purple: #8b5cf6;
  --text: #1c1e21;
  --muted: #65676b;
- --glass: rgba(255,255,255,0.92);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
@@ -33,7 +28,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
  position:sticky;top:0;z-index:100;
  box-shadow:0 2px 8px rgba(0,0,0,0.18);
 }
-#header-logo{font-size:24px;}
 #header h1{font-size:17px;font-weight:800;letter-spacing:-0.3px;color:#fff;-webkit-text-fill-color:#fff}
 #header-badge{
  margin-left:auto;
@@ -148,7 +142,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
  background:radial-gradient(ellipse at 50% 0%,rgba(24,119,242,0.04),transparent 70%);
  pointer-events:none;
 }
-#result-icon{font-size:30px;line-height:1}
 #result-main{font-size:19px;font-weight:800;text-align:center;line-height:1.2;letter-spacing:-0.3px}
 #result-detail{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;max-width:280px}
 #result-dir{
@@ -281,7 +274,6 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
 <body>
 
 <div id="header">
- <span id="header-logo"></span>
  <h1>Path Vision AI</h1>
  <span id="header-badge">Gemini 3.5</span>
 </div>
@@ -328,7 +320,6 @@ input:checked+.slider-tgl:before{transform:translateX(20px)}
  </div>
 
  <div id="result-box">
- <span id="result-icon"></span>
  <div id="result-main" style="color:var(--text)">รอการวิเคราะห์</div>
  <div id="result-detail">ใส่ API Key แล้วกดเริ่มกล้อง</div>
  <div id="result-dir"></div>
@@ -479,7 +470,6 @@ let showRaw=false, analyzing=false;
 let rateLimitUntil=0;
 const SPEECH_COOLDOWN=8000;
 const COLOR={safe:'#22c55e',warning:'#f59e0b',danger:'#ef4444'};
-const ICON ={safe:'',warning:'',danger:''};
 
 const video=document.getElementById('video');
 
@@ -584,7 +574,7 @@ function updateKeyBadge(){
 }
 function onModelChange(val){
  localStorage.setItem('gm',val);
- const names={'gemini-3.5-flash':'3.5 Flash','gemini-3-flash-preview':'3 Flash','gemini-3.1-flash-lite':'3.1 Flash-Lite','gemini-2.5-flash':'2.5 Flash','gemini-3.1-pro-preview':'3.1 Pro'};
+ const names={'gemini-3.5-flash':'3.5 Flash','gemini-3-flash-preview':'3 Flash','gemini-3.1-flash-lite':'3.1 Flash-Lite','gemini-3.1-pro-preview':'3.1 Pro'};
  const hm=document.getElementById('header-badge');
  if(hm)hm.textContent='Gemini '+(names[val]||val);
  const ep=document.getElementById('info-endpoint');
@@ -613,8 +603,6 @@ function setStatus(txt,state){
 }
 function setResult(p){
  const color=COLOR[p.safety]||'#e8f0ff';
- const icon=ICON[p.safety]||'';
- document.getElementById('result-icon').textContent=icon;
  const m=document.getElementById('result-main');
  m.textContent=p.hasPath?(getLang().startsWith('th')?'พบเส้นทาง':'Path Found'):(getLang().startsWith('th')?'ไม่พบเส้นทาง':'No Path');
  m.style.color=color;
